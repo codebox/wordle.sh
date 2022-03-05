@@ -9,23 +9,56 @@ LOCAL_FILE=${TMPDIR:-/tmp/}$WORD_FILE
 function process_arg {
   WORD=${1:0:5}
   PATTERN=${1:6:5}
-  for i in {0..4}; do
-  	LETTER=${WORD:$i:1}
-  	SYMBOL=${PATTERN:$i:1}
-  	TMP_LETTER="${DOTS}${LETTER}${DOTS}"
-  	POS_LETTER=${TMP_LETTER:4-i:5}
-  	case $SYMBOL in
-  		0)
-  			AWKS+=("!/${LETTER}/")
-  			;;
-  		1)
-  			AWKS+=("/${LETTER}/" "!/${POS_LETTER}/")
-  			;;
-  		2)
-  			AWKS+=("/${POS_LETTER}/")
-  			;;
-  	esac
-  done
+  while read UNIQUE_LETTER
+  do
+    ZERO_COUNT=0
+    ONE_COUNT=0
+    TWO_COUNT=0
+    TWO_POSN=''
+    ONE_POSN=''
+    for i in {0..4}; do
+      THIS_LETTER=${WORD:$i:1}
+      THIS_SYMBOL=${PATTERN:$i:1}
+      if [[ "$UNIQUE_LETTER" = "$THIS_LETTER" ]]; then
+        case $THIS_SYMBOL in
+          0)
+            ((ZERO_COUNT = ZERO_COUNT + 1))
+            ONE_POSN="${ONE_POSN}."
+            TWO_POSN="${TWO_POSN}."
+            ;;
+          1)
+            ((ONE_COUNT = ONE_COUNT + 1))
+            ONE_POSN="${ONE_POSN}[^${UNIQUE_LETTER}]"
+            TWO_POSN="${TWO_POSN}."
+            ;;
+          2)
+            ((TWO_COUNT = TWO_COUNT + 1))
+            ONE_POSN="${ONE_POSN}."
+            TWO_POSN="${TWO_POSN}${UNIQUE_LETTER}"
+            ;;
+        esac
+      else
+          ONE_POSN="${ONE_POSN}."
+          TWO_POSN="${TWO_POSN}."
+      fi
+    done
+    ((FINAL_COUNT = ONE_COUNT + TWO_COUNT))
+    REPETITION=""
+    if [[ $FINAL_COUNT -eq 0 ]]; then
+      AWKS+=("!/${UNIQUE_LETTER}/")
+    else
+      if [[ $ZERO_COUNT -eq 0 ]]; then
+        REPETITION=","
+      fi
+      AWKS+=("/([^${UNIQUE_LETTER}]*${UNIQUE_LETTER}){${FINAL_COUNT}${REPETITION}}/")
+    fi
+    if [[ $TWO_COUNT -gt 0 ]]; then
+      AWKS+=("/${TWO_POSN}/")
+    fi
+    if [[ $ONE_COUNT -gt 0 ]]; then
+      AWKS+=("/${ONE_POSN}/")
+    fi
+  done < <(echo $WORD | grep -o . | sort -u)
 }
 for var in "$@"; do
     if [[ "$var" =~ ^[a-z]{5},[012]{5}$ ]]; then
@@ -36,10 +69,10 @@ for var in "$@"; do
     fi
 done
 
-echo 1
 if [ ! -f "$LOCAL_FILE" ]; then
     curl -s -o "$LOCAL_FILE" $WORD_FILE_URL
 fi
-echo $LOCAL_FILE
+
 AWK_CODE=$(echo "${AWKS[@]}" | sed  "s/ / \&\& /g")
 awk "$AWK_CODE" "$LOCAL_FILE"
+echo $AWK_CODE
