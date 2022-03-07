@@ -3,7 +3,6 @@
 WORD_FILE=words.txt
 WORD_FILE_URL=http://localhost:8000/$WORD_FILE
 AWKS=()
-DOTS='....'
 LOCAL_FILE=${TMPDIR:-/tmp/}$WORD_FILE
 
 function process_arg {
@@ -14,33 +13,27 @@ function process_arg {
     ZERO_COUNT=0
     ONE_COUNT=0
     TWO_COUNT=0
-    TWO_POSN=''
-    ONE_POSN=''
+    POSITIONS=''
     for i in {0..4}; do
       THIS_LETTER=${WORD:$i:1}
       THIS_SYMBOL=${PATTERN:$i:1}
+      THIS_POSITION="."
       if [[ "$UNIQUE_LETTER" = "$THIS_LETTER" ]]; then
         case $THIS_SYMBOL in
           0)
             ((ZERO_COUNT = ZERO_COUNT + 1))
-            ONE_POSN="${ONE_POSN}."
-            TWO_POSN="${TWO_POSN}."
             ;;
           1)
             ((ONE_COUNT = ONE_COUNT + 1))
-            ONE_POSN="${ONE_POSN}[^${UNIQUE_LETTER}]"
-            TWO_POSN="${TWO_POSN}."
+            THIS_POSITION="[^${UNIQUE_LETTER}]"
             ;;
           2)
             ((TWO_COUNT = TWO_COUNT + 1))
-            ONE_POSN="${ONE_POSN}."
-            TWO_POSN="${TWO_POSN}${UNIQUE_LETTER}"
+            THIS_POSITION="${UNIQUE_LETTER}"
             ;;
         esac
-      else
-          ONE_POSN="${ONE_POSN}."
-          TWO_POSN="${TWO_POSN}."
       fi
+      POSITIONS="${POSITIONS}${THIS_POSITION}"
     done
     ((FINAL_COUNT = ONE_COUNT + TWO_COUNT))
     REPETITION=""
@@ -52,14 +45,12 @@ function process_arg {
       fi
       AWKS+=("/([^${UNIQUE_LETTER}]*${UNIQUE_LETTER}){${FINAL_COUNT}${REPETITION}}/")
     fi
-    if [[ $TWO_COUNT -gt 0 ]]; then
-      AWKS+=("/${TWO_POSN}/")
-    fi
-    if [[ $ONE_COUNT -gt 0 ]]; then
-      AWKS+=("/${ONE_POSN}/")
+    if [[ $FINAL_COUNT -gt 0 ]]; then
+      AWKS+=("/${POSITIONS}/")
     fi
   done < <(echo $WORD | grep -o . | sort -u)
 }
+
 for var in "$@"; do
     if [[ "$var" =~ ^[a-z]{5},[012]{5}$ ]]; then
       process_arg "$var"
