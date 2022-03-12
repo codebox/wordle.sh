@@ -7,9 +7,13 @@ with open('words.txt', 'r') as f:
             counts[c] += 1
 
 def score_word(word):
-    functools.reduce(lambda c: counts[c], set(list(word)), 0)
+    return functools.reduce(lambda a,c: a+counts[c], set(list(word)), 0)
 
+words_with_scores=[]
 with open('words.txt', 'r') as f:
     for line in f.readlines():
         word = line.strip()
-        print(word, score_word(word))
+        words_with_scores.append((word, score_word(word)))
+words_with_scores.sort(key=lambda t: t[1])
+for word in words_with_scores:
+	print(word[0])

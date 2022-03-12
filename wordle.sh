@@ -1,18 +1,37 @@
 #!/usr/bin/env bash
 
 WORD_FILE=words.txt
+WORD_FILE_DIR=words
 WORD_FILE_URL=http://localhost:8000/$WORD_FILE
+SUGGESTION_COUNT=10
 AWKS=()
-LOCAL_FILE=${TMPDIR:-/tmp/}$WORD_FILE
+LOCAL_FILE="${WORD_FILE_DIR}/${WORD_FILE}"
+INSTRUCTIONS=$(cat <<-END
+=====================
+=-  WORDLE SOLVER  -=
+=====================
+Usage: $0 <word>,<result> (<word>,<result> ...)
+  * <word>:   five letter word
+  * <result>: five letters indicating the result that you got from Wordle:
+    > b: Black square (letter does not appear in word)
+    > y: Yellow square (letter appears in another position)
+    > g: Green square (letter appears in this position)
 
+Example: $0 crane,bygbb stair,bbgby
+END
+)
+
+function tolower {
+  echo $1 | tr '[:upper:]' '[:lower:]'
+}
 function process_arg {
-  WORD=${1:0:5}
-  PATTERN=${1:6:5}
+  WORD=$(tolower ${1:0:5})
+  PATTERN=$(tolower ${1:6:5})
   while read UNIQUE_LETTER
   do
-    ZERO_COUNT=0
-    ONE_COUNT=0
-    TWO_COUNT=0
+    BLACK_COUNT=0
+    YELLOW_COUNT=0
+    GREEN_COUNT=0
     POSITIONS=''
     for i in {0..4}; do
       THIS_LETTER=${WORD:$i:1}
@@ -20,50 +39,67 @@ function process_arg {
       THIS_POSITION="."
       if [[ "$UNIQUE_LETTER" = "$THIS_LETTER" ]]; then
         case $THIS_SYMBOL in
-          0)
-            ((ZERO_COUNT = ZERO_COUNT + 1))
+          b)
+            ((BLACK_COUNT = BLACK_COUNT + 1))
             ;;
-          1)
-            ((ONE_COUNT = ONE_COUNT + 1))
+          y)
+            ((YELLOW_COUNT = YELLOW_COUNT + 1))
             THIS_POSITION="[^${UNIQUE_LETTER}]"
             ;;
-          2)
-            ((TWO_COUNT = TWO_COUNT + 1))
+          g)
+            ((GREEN_COUNT = GREEN_COUNT + 1))
             THIS_POSITION="${UNIQUE_LETTER}"
             ;;
         esac
       fi
       POSITIONS="${POSITIONS}${THIS_POSITION}"
     done
-    ((FINAL_COUNT = ONE_COUNT + TWO_COUNT))
+    ((TOTAL_COUNT = YELLOW_COUNT + GREEN_COUNT))
     REPETITION=""
-    if [[ $FINAL_COUNT -eq 0 ]]; then
+    if [[ $TOTAL_COUNT -eq 0 ]]; then
       AWKS+=("!/${UNIQUE_LETTER}/")
     else
-      if [[ $ZERO_COUNT -eq 0 ]]; then
+      if [[ $BLACK_COUNT -eq 0 ]]; then
         REPETITION=","
       fi
-      AWKS+=("/([^${UNIQUE_LETTER}]*${UNIQUE_LETTER}){${FINAL_COUNT}${REPETITION}}/")
+      AWKS+=("/([^${UNIQUE_LETTER}]*${UNIQUE_LETTER}){${TOTAL_COUNT}${REPETITION}}/")
     fi
-    if [[ $FINAL_COUNT -gt 0 ]]; then
+    if [[ $TOTAL_COUNT -gt 0 ]]; then
       AWKS+=("/${POSITIONS}/")
     fi
   done < <(echo $WORD | grep -o . | sort -u)
 }
 
+if [[ $# -eq 0 ]] ; then
+    echo "$INSTRUCTIONS"
+    exit 0
+fi
+
 for var in "$@"; do
-    if [[ "$var" =~ ^[a-z]{5},[012]{5}$ ]]; then
+    if [[ "$var" =~ ^[A-Za-z]{5},[bygBYG]{5}$ ]]; then
       process_arg "$var"
     else
-      echo "Bad argument: '$var' Each argument must be exactly 5 lower-case letters, followed by a comma, followed by 5 of the digits 0,1 or 2"
+      echo "Bad argument: '$var'"
       exit 1
     fi
 done
 
 if [ ! -f "$LOCAL_FILE" ]; then
-    curl -s -o "$LOCAL_FILE" $WORD_FILE_URL
+  echo "Downloading ${WORD_FILE}..."
+  mkdir -p "$WORD_FILE_DIR"
+  curl -s -o "$LOCAL_FILE" $WORD_FILE_URL
 fi
 
 AWK_CODE=$(echo "${AWKS[@]}" | sed  "s/ / \&\& /g")
-awk "$AWK_CODE" "$LOCAL_FILE"
-echo $AWK_CODE
+POSSIBILITIES=$(awk "$AWK_CODE" "$LOCAL_FILE")
+SUGGESTIONS=$(echo "$POSSIBILITIES" | tail -${SUGGESTION_COUNT} | tr '\n' ' ' | tr '[:lower:]' '[:upper:]')
+MATCH_COUNT=$(echo "$POSSIBILITIES" | wc -l | sed "s/ //g")
+
+if [[ $MATCH_COUNT -eq 0 ]]; then
+  echo "No valid matches found, maybe check your arguments?"
+elif [[ $MATCH_COUNT -eq 1 ]]; then
+  echo "The only match is $SUGGESTIONS"
+else
+  echo $SUGGESTIONS
+  echo "[${MATCH_COUNT} matches found in total]"
+fi  
