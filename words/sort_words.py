@@ -14,6 +14,7 @@ with open('words.txt', 'r') as f:
     for line in f.readlines():
         word = line.strip()
         words_with_scores.append((word, score_word(word)))
+
 words_with_scores.sort(key=lambda t: t[1])
 for word in words_with_scores:
 	print(word[0])

@@ -41,6 +41,7 @@ function process_arg {
         case $THIS_SYMBOL in
           b)
             ((BLACK_COUNT = BLACK_COUNT + 1))
+            THIS_POSITION="[^${UNIQUE_LETTER}]"
             ;;
           y)
             ((YELLOW_COUNT = YELLOW_COUNT + 1))
