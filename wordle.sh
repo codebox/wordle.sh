@@ -10,9 +10,10 @@ INSTRUCTIONS=$(cat <<-END
 =====================
 =-  WORDLE SOLVER  -=
 =====================
-Usage: $0 <word>,<result> (<word>,<result> ...)
-  * <word>:   five letter word
-  * <result>: five letters indicating the result that you got from Wordle:
+Usage: $0 [--count=<suggestions>] <word>,<result> (<word>,<result> ...)
+  * suggestions: maximum number of matching words to display (default is ${SUGGESTION_COUNT})
+  * <word>:      five letter word that you guessed
+  * <result>:    five letters indicating the result that you got from Wordle:
     > b: Black square (letter does not appear in word)
     > y: Yellow square (letter appears in another position)
     > g: Green square (letter appears in this position)
@@ -71,19 +72,21 @@ function process_arg {
   done < <(echo $WORD | grep -o . | sort -u)
 }
 
-if [[ $# -eq 0 ]] ; then
-    echo "$INSTRUCTIONS"
-    exit 0
-fi
-
 for var in "$@"; do
     if [[ "$var" =~ ^[A-Za-z]{5},[bygBYG]{5}$ ]]; then
       process_arg "$var"
+    elif [[ "$var" =~ ^--count=[0-9]+$ ]]; then
+      SUGGESTION_COUNT=${var:8}
     else
       echo "Bad argument: '$var'"
       exit 1
     fi
 done
+
+if [[ ${#AWKS[@]} -eq 0 ]] ; then
+    echo "$INSTRUCTIONS"
+    exit 0
+fi
 
 if [ ! -f "$LOCAL_FILE" ]; then
   echo "Downloading ${WORD_FILE}..."
@@ -94,7 +97,7 @@ fi
 AWK_CODE=$(echo "${AWKS[@]}" | sed  "s/ / \&\& /g")
 POSSIBILITIES=$(awk "$AWK_CODE" "$LOCAL_FILE")
 SUGGESTIONS=$(echo "$POSSIBILITIES" | tail -${SUGGESTION_COUNT} | tr '\n' ' ' | tr '[:lower:]' '[:upper:]')
-MATCH_COUNT=$(echo "$POSSIBILITIES" | wc -l | sed "s/ //g")
+MATCH_COUNT=$(echo "$POSSIBILITIES" | grep -c . )
 
 if [[ $MATCH_COUNT -eq 0 ]]; then
   echo "No valid matches found, maybe check your arguments?"
