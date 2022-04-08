@@ -2,7 +2,7 @@
 
 WORD_FILE=words.txt
 WORD_FILE_DIR=words
-WORD_FILE_URL=http://localhost:8000/$WORD_FILE
+WORD_FILE_URL=https://codebox.net/assets/documents/wordle/$WORD_FILE
 SUGGESTION_COUNT=10
 AWKS=()
 LOCAL_FILE="${WORD_FILE_DIR}/${WORD_FILE}"
